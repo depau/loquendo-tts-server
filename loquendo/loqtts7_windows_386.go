@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"loq7tts-server/loquendo/ffi_wrapper"
+	"math/rand"
 	"os"
 	"strings"
 	"unsafe"
@@ -124,9 +125,6 @@ func (t *TTS) Close() error {
 		}
 		t.hSession = 0
 	}
-	if err := ttsLib.Close(); err != nil {
-		return fmt.Errorf("error closing TTS library: %v", err)
-	}
 	return nil
 }
 
@@ -180,7 +178,8 @@ func (t *TTS) SpeakStreaming(text string, voice string) (<-chan []byte, error) {
 	}
 
 	// The .wav extension is important, otherwise the engine will write raw PCM data without a header
-	pipeName := fmt.Sprintf(`\\.\pipe\loq7tts_pipe_%d_%d.wav`, os.Getpid(), t.currentPromptID)
+	randInt := rand.Int()
+	pipeName := fmt.Sprintf(`\\.\pipe\loq7tts_pipe_%d_%d_%d.wav`, os.Getpid(), t.currentPromptID, randInt)
 	if t.pipe, err = npipe.Listen(pipeName); err != nil {
 		return nil, fmt.Errorf("error creating WAV data named pipe: %v", err)
 	}
