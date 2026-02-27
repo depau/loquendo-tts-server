@@ -192,27 +192,6 @@ class TTSClient {
         }
     }
 
-    // Simulate progress
-    simulateProgress() {
-        return new Promise((resolve) => {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 15 + 5;
-
-                if (progress < 30) {
-                    this.updateProgress(Math.min(progress, 25), this.t('loading.sendingRequest'));
-                } else if (progress < 60) {
-                    this.updateProgress(Math.min(progress, 55), this.t('loading.processingText'));
-                } else if (progress < 85) {
-                    this.updateProgress(Math.min(progress, 80), this.t('loading.synthesizing'));
-                } else {
-                    this.updateProgress(90, this.t('loading.gettingResult'));
-                    clearInterval(interval);
-                    resolve();
-                }
-            }, 10 + Math.random() * 50);
-        });
-    }
 
     // Show errors
     showError(message) {
@@ -250,8 +229,6 @@ class TTSClient {
         document.getElementById('generateBtn').disabled = true;
 
         this.updateProgress(0, this.t('loading.initialization'), `${text.length} ${this.t('units.characters')}`);
-
-        const progressPromise = this.simulateProgress();
 
         try {
             const requestData = {
@@ -296,7 +273,6 @@ class TTSClient {
             console.log('Received audio:', audioBlob.size, this.t('units.bytes'));
 
             // Wait for progress animation to finish
-            await progressPromise;
             this.updateProgress(100, this.t('loading.ready'), `${(audioBlob.size / 1024).toFixed(1)} ${this.t('units.kb')}`);
 
             // Small delay to show 100%
