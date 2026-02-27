@@ -5,7 +5,9 @@ go 1.26
 require (
 	github.com/mkideal/cli v0.2.7
 	github.com/natefinch/npipe v0.0.0-20160621034901-c1b8fa8bdcce
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sys v0.41.0
+	golang.org/x/text v0.3.0
 )
 
 require (

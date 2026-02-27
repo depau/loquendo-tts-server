@@ -1,0 +1,147 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"loq7tts-server/loquendo"
+	"os"
+	"runtime/debug"
+
+	"github.com/mkideal/cli"
+)
+
+type argT struct {
+	cli.Helper
+	Text       string `cli:"t,text" usage:"Text to speak, - for stdin. Default: the voice's demo sentence" dft:""`
+	Voice      string `cli:"v,voice" usage:"Voice to use"`
+	ListVoices bool   `cli:"l,list-voices" usage:"List available voices" dft:"false"`
+	JsonOutput bool   `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
+	Output     string `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
+	DebugTTS   bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
+	Version    bool   `cli:"V,version" usage:"show version information" dft:"false"`
+}
+
+func main() {
+	os.Exit(cli.Run(new(argT), func(ctx *cli.Context) error {
+		argv := ctx.Argv().(*argT)
+
+		if argv.Version {
+			goLibVersion := "unknown"
+			buildInfo, ok := debug.ReadBuildInfo()
+			if ok {
+				goLibVersion = buildInfo.Main.Version
+			}
+
+			loqVersion, err := loquendo.GetVersionInfo()
+			if err != nil {
+				println("error")
+				return err
+			}
+
+			if argv.JsonOutput {
+				type versionInfo struct {
+					GoLibVersion    string `json:"go_lib_version"`
+					LoquendoVersion string `json:"loquendo_version"`
+				}
+				vInfo := versionInfo{
+					GoLibVersion:    goLibVersion,
+					LoquendoVersion: loqVersion,
+				}
+				jsonData, err := json.MarshalIndent(vInfo, "", "  ")
+				if err != nil {
+					return err
+				}
+				println(string(jsonData))
+			} else {
+				println("Loquendo TTS wrapper for Go:", goLibVersion)
+				println("Loquendo engine version:", loqVersion)
+			}
+
+			return nil
+		}
+
+		loq, err := loquendo.NewTTS(nil)
+		if err != nil {
+			return err
+		}
+		defer loq.Close()
+
+		if argv.DebugTTS {
+			loq.SetDebugEvents(true)
+		}
+
+		voices, err := loq.GetVoices()
+		if err != nil {
+			return err
+		}
+
+		if argv.ListVoices {
+			if argv.JsonOutput {
+				jsonData, err := json.MarshalIndent(voices, "", "  ")
+				if err != nil {
+					return err
+				}
+				println(string(jsonData))
+				return nil
+			}
+
+			println("Available voices:")
+			for _, v := range voices {
+				println(" - Id:", v.Id)
+				fmt.Printf("   Native language: %s\n", v.NativeLanguage)
+				fmt.Printf("   Gender: %s\n", v.Gender)
+				fmt.Printf("   Age: %d\n", v.Age)
+				fmt.Printf("   Description: %s\n", v.Description)
+			}
+			return nil
+		}
+
+		voiceId := argv.Voice
+		var voice *loquendo.Voice = nil
+		for _, v := range voices {
+			if v.Id == voiceId {
+				voice = &v
+				break
+			}
+		}
+		if voice == nil {
+			return fmt.Errorf("voice not found: %s", voiceId)
+		}
+
+		text := argv.Text
+		if text == "" {
+			text = voice.DemoSentence
+		} else if text == "-" {
+			bytes, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return err
+			}
+			text = string(bytes)
+		}
+
+		dataChan, err := loq.SpeakStreaming(text, voiceId)
+		if err != nil {
+			return err
+		}
+
+		var output io.Writer
+		if argv.Output == "-" {
+			output = os.Stdout
+		} else {
+			output, err = os.Create(argv.Output)
+			if err != nil {
+				return fmt.Errorf("error opening output file: %s", err)
+			}
+			defer output.(*os.File).Close()
+		}
+
+		for chunk := range dataChan {
+			if _, err := output.Write(chunk); err != nil {
+				return fmt.Errorf("error writing audio chunk to output: %v", err)
+			}
+		}
+
+		return nil
+	}))
+}

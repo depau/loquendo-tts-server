@@ -10,8 +10,12 @@ import (
 	"loq7tts-server/loquendo/ffi_wrapper"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"unsafe"
+
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/transform"
 
 	"github.com/natefinch/npipe"
 )
@@ -30,6 +34,17 @@ type TTS struct {
 	sampleRate uint32
 
 	debugEvents bool
+}
+
+type Voice struct {
+	Id             string `json:"id"`              // Id is the unique voice identifier
+	Description    string `json:"description"`     // Description is the voice mnemonic description
+	Gender         string `json:"gender"`          // Gender is the voice gender
+	Age            int    `json:"age"`             // Age is the voice age
+	NativeLanguage string `json:"native_language"` // NativeLanguage is the voice's native language
+	DemoSentence   string `json:"demo_sentence"`   // DemoSentence is a sample sentence in which the voice introduces itself using its native language
+	BaseSpeed      int    `json:"base_speed"`      // BaseSpeed is the voice default speech in word/minute
+	BasePitch      int    `json:"base_pitch"`      // BasePitch is the voice default pitch in hertz
 }
 
 func InitEngineDLL(dllPath *string) (err error) {
@@ -144,9 +159,20 @@ func (t *TTS) SetAudioSettings(sampleRate uint, mono bool) {
 	t.sampleRate = uint32(sampleRate)
 }
 
-func (t *TTS) GetVoices() ([]string, error) {
+func fixStringEncoding(input string) (string, error) {
+	inputBytes := []byte(input)
+	e, _, _ := charset.DetermineEncoding(inputBytes, "")
+	reader := transform.NewReader(bytes.NewReader(inputBytes), e.NewDecoder())
+	decoded, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
+func (t *TTS) GetVoices() ([]Voice, error) {
 	outBuf := make([]byte, 2048)
-	err := ttsLib.TTSQuery(t.hSession, ffi_wrapper.TTSQueryObjectVoice, "Id", nil, &outBuf, false, false)
+	err := ttsLib.TTSQuery(t.hSession, ffi_wrapper.TTSQueryObjectVoice, "Id,Description,Gender,Age,MotherTongue,BaseSpeed,BasePitch,DemoSentence", nil, &outBuf, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("error querying voices: %v", err)
 	}
@@ -155,7 +181,45 @@ func (t *TTS) GetVoices() ([]string, error) {
 		outBuf = outBuf[:i]
 	}
 	outStr := string(outBuf)
-	return strings.Split(outStr, ";"), nil
+	lines := strings.Split(outStr, ";")
+
+	voices := make([]Voice, len(lines))
+	for i, line := range lines {
+		parts := strings.Split(line, ",")
+
+		id := parts[0]
+		description := parts[1]
+		gender := parts[2]
+		age, err := strconv.Atoi(parts[3])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing voice age: %v", err)
+		}
+		motherTongue := parts[4]
+		baseSpeed, err := strconv.Atoi(parts[5])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing voice base speed: %v", err)
+		}
+		basePitch, err := strconv.Atoi(parts[6])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing voice base pitch: %v", err)
+		}
+		demoSentence, err := fixStringEncoding(strings.Join(parts[7:], ","))
+		if err != nil {
+			return nil, fmt.Errorf("error parsing voice demo sentence: %v", err)
+		}
+
+		voices[i] = Voice{
+			Id:             id,
+			Description:    description,
+			Gender:         gender,
+			Age:            age,
+			NativeLanguage: motherTongue,
+			BaseSpeed:      baseSpeed,
+			BasePitch:      basePitch,
+			DemoSentence:   demoSentence,
+		}
+	}
+	return voices, nil
 }
 
 func ttsCallbackWrapper(promptID uint32, eventType ffi_wrapper.TTSEventType, iData uintptr, pUser uintptr) uint32 {

@@ -34,7 +34,7 @@ func main() {
 	}))
 }
 
-func getAvailableVoices() ([]string, error) {
+func getAvailableVoices() ([]loquendo.Voice, error) {
 	loq, err := loquendo.NewTTS(nil)
 	if err != nil {
 		return nil, err
@@ -103,8 +103,8 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 
 	voice := ""
 	for _, v := range voices {
-		if strings.EqualFold(v, inputVoice) {
-			voice = v
+		if strings.EqualFold(v.Id, inputVoice) {
+			voice = v.Id
 			break
 		}
 	}
@@ -143,7 +143,7 @@ func runServer(argv *argT) error {
 	}
 	println("Available voices:")
 	for _, v := range voices {
-		println(" -", v)
+		println(" -", v.Id)
 	}
 
 	models := make(map[string]any)
@@ -152,9 +152,11 @@ func runServer(argv *argT) error {
 	models["object"] = "list"
 	for _, v := range voices {
 		data = append(data, map[string]string{
-			"id":     fmt.Sprintf("tts-loquendo-%s", strings.ToLower(v)),
-			"name":   v,
-			"object": "model",
+			"id":              fmt.Sprintf("tts-loquendo-%s", strings.ToLower(v.Id)),
+			"name":            v.Id,
+			"native_language": v.NativeLanguage,
+			"gender":          v.Gender,
+			"object":          "model",
 		})
 	}
 	models["data"] = data
