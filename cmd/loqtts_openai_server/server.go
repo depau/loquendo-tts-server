@@ -1,15 +1,21 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"loq7tts-server/loquendo"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/mkideal/cli"
 )
+
+//go:embed web/*
+var webContent embed.FS
 
 type argT struct {
 	cli.Helper
@@ -147,6 +153,7 @@ func runServer(argv *argT) error {
 	for _, v := range voices {
 		data = append(data, map[string]string{
 			"id":     fmt.Sprintf("tts-loquendo-%s", strings.ToLower(v)),
+			"name":   v,
 			"object": "model",
 		})
 	}
@@ -175,6 +182,13 @@ func runServer(argv *argT) error {
 		serveSpeech(argv.DebugTTS, writer, request)
 	})))
 
+	webFS := mustSub(webContent, "web")
+	mux.Handle("GET /web/", http.StripPrefix("/web/", http.FileServer(http.FS(webFS))))
+
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/web/", http.StatusFound)
+	})
+
 	corsMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -201,4 +215,58 @@ func runServer(argv *argT) error {
 	}
 
 	return nil
+}
+
+func mustSub(fsys fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(fsys, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}
+
+func serveEmbeddedFile(w http.ResponseWriter, name, ctype string) {
+	b, err := webContent.ReadFile(name)
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	if ctype != "" {
+		w.Header().Set("Content-Type", ctype)
+	}
+	_, _ = w.Write(b)
+}
+
+func exists(fsys fs.FS, name string) bool {
+	f, err := fsys.Open(name)
+	if err != nil {
+		return false
+	}
+	_ = f.Close()
+	return true
+}
+
+func contentType(filename string) string {
+	switch strings.ToLower(path.Ext(filename)) {
+	case ".html":
+		return "text/html; charset=utf-8"
+	case ".js":
+		return "application/javascript; charset=utf-8"
+	case ".css":
+		return "text/css; charset=utf-8"
+	case ".svg":
+		return "image/svg+xml"
+	case ".png":
+		return "image/png"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func cacheStatic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Long cache for embedded versioned assets; for quick iteration, set to no-store.
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		next.ServeHTTP(w, r)
+	})
 }

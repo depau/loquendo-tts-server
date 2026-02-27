@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI TTS Client</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <h1 data-translate="title">Loquendo TTS 🎤</h1>
+        
+        <!-- Main form -->
+        <form id="ttsForm">
+            <!-- API key -->
+            <div class="form-group">
+                <label for="apiKey" data-translate="form.apiKey">🔑 OpenAI API Key</label>
+                <input type="password" id="apiKey" data-translate-placeholder="form.apiKeyPlaceholder">
+            </div>
+
+            <!-- TTS model -->
+            <div class="form-group">
+                <label for="model" data-translate="form.model">🤖 Voice</label>
+                <select id="model" required>
+                    <option value="" data-translate="models.loading">Loading models...</option>
+                </select>
+            </div>
+
+            <!-- Text to convert -->
+            <div class="form-group">
+                <label for="text" data-translate="form.text">📝 Text to Speech</label>
+                <textarea id="text" data-translate-placeholder="form.textPlaceholder" placeholder="Enter text to convert to speech..." required></textarea>
+            </div>
+
+            <!-- Voice and format row -->
+            <div class="row">
+                <!-- Audio format -->
+                <div class="form-group">
+                    <label for="format" data-translate="form.format">🎧 Audio Format</label>
+                    <select id="format">
+<!--                        <option value="mp3" data-translate="formats.mp3">MP3 (default)</option>-->
+<!--                        <option value="opus" data-translate="formats.opus">Opus (low latency)</option>-->
+<!--                        <option value="aac" data-translate="formats.aac">AAC (YouTube, mobile)</option>-->
+<!--                        <option value="flac" data-translate="formats.flac">FLAC (lossless)</option>-->
+                        <option value="wav" data-translate="formats.wav">WAV (low latency)</option>
+<!--                        <option value="pcm" data-translate="formats.pcm">PCM (raw data)</option>-->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Speech speed for legacy models -->
+            <div class="form-group" id="speedGroup">
+                <label for="speed" data-translate="form.speed">⚡ Speech Speed (legacy models only)</label>
+                <div class="speed-container">
+                    <span>0.25x</span>
+                    <input type="range" id="speed" min="0.25" max="4.0" step="0.05" value="1.0">
+                    <span>4.0x</span>
+                    <div class="speed-value">1.0x</div>
+                </div>
+                <small style="color: #666; font-size: 12px;" data-translate="form.speedHint">For GPT models use instructions above</small>
+            </div>
+
+            <!-- Generate button -->
+            <button type="submit" class="generate-btn" id="generateBtn" data-translate="form.generateBtn">
+                🎤 Generate Speech
+            </button>
+        </form>
+
+        <!-- Loading indicator -->
+        <div class="loading" id="loading">
+            <div class="loading-header">
+                <div class="spinner"></div>
+                <span id="loadingTitle" data-translate="loading.preparing">Preparing request...</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="loading-info">
+                <div class="loading-status" id="loadingStatus" data-translate="loading.initialization">Initialization...</div>
+                <div class="loading-details" id="loadingDetails">0%</div>
+            </div>
+        </div>
+
+        <!-- Error display -->
+        <div class="error" id="error"></div>
+
+        <!-- Result display -->
+        <div class="result" id="result">
+            <h3 data-translate="result.title">✅ Audio ready!</h3>
+            <audio controls id="audioPlayer"></audio>
+            <br>
+            <a href="#" class="download-btn" id="downloadBtn" data-translate="result.download">⬇️ Download audio</a>
+        </div>
+    </div>
+
+    <!-- Script imports -->
+    <script src="lang-en.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
