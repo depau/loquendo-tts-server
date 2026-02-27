@@ -45,6 +45,7 @@ func InitEngineDLL(dllPath *string) (err error) {
 			return fmt.Errorf("error finding engine DLL path: %v", err)
 		}
 	}
+	fmt.Printf("loading engine DLL from '%s'\n", path)
 	ttsLib, err = ffi_wrapper.LoadEngineDLL(path)
 	return err
 }

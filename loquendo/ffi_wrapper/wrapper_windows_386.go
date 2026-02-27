@@ -5,6 +5,7 @@ package ffi_wrapper
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"unsafe"
@@ -232,7 +233,12 @@ func (l *TTSLibrary) TTSEnableEvent(reader TTSHandle, eventType TTSEventType, en
 }
 
 func findEngineLibPathFromRegistry() (string, error) {
-	for _, subkey := range []string{`SOFTWARE\Loquendo\LTTS7\Engine`, `SOFTWARE\Loquendo\LTTS7\SDK`} {
+	for _, subkey := range []string{
+		`SOFTWARE\Loquendo\LTTS7\Engine`,
+		`SOFTWARE\Loquendo\LTTS7\SDK`,
+		`SOFTWARE\Loquendo\LTTS7\LoqSAPI5`,
+		`SOFTWARE\Loquendo\LTTS7\default.session`,
+	} {
 		for _, root := range []registry.Key{registry.LOCAL_MACHINE, registry.CURRENT_USER} {
 			k, err := registry.OpenKey(root, subkey, registry.QUERY_VALUE)
 			if err != nil {
@@ -244,14 +250,21 @@ func findEngineLibPathFromRegistry() (string, error) {
 			if err != nil {
 				continue
 			}
-			s = strings.TrimSpace(s)
+			s = strings.TrimSpace(strings.Trim(s, `\`))
+			if strings.HasSuffix(s, `\Data`) {
+				s = strings.TrimSuffix(s, `\Data`)
+			}
 			if s != "" {
 				// Often ends with a trailing slash already; keep as-is for filepath.Join behavior.
 				return s, nil
 			}
 		}
 	}
-	return "", errors.New("engine path not found in registry")
+	fallback := `C:\Program Files (x86)\Loquendo\LTTS7\bin\LoqTTS7.dll`
+	if _, err := os.Stat(fallback); err == nil {
+		return filepath.Dir(fallback), nil
+	}
+	return "", errors.New("engine path not found")
 }
 
 func GetDefaultEngineLibPath() (string, error) {
