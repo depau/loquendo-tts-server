@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"io/fs"
 	"loq7tts-server/loquendo"
+	"loq7tts-server/pkg/utils"
 	"math"
 	"net/http"
 	"os"
-	"path"
 	"strings"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/mkideal/cli"
+	"github.com/rs/zerolog"
 )
 
 //go:embed web/*
@@ -23,13 +26,23 @@ type argT struct {
 	BindAddr string `cli:"a,addr" usage:"address to listen on" dft:":8080"`
 	DebugTTS bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
 	ApiKey   string `cli:"k,apikey" usage:"API key for authentication" dft:""`
+	LogLevel string `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
+	JsonLogs bool   `cli:"j,json-logs" usage:"Output JSON logs instead of plain text" dft:"false"`
 }
 
 func main() {
 	os.Exit(cli.Run(new(argT), func(ctx *cli.Context) error {
 		argv := ctx.Argv().(*argT)
+		if err := utils.SetLogLevel(argv.LogLevel); err != nil {
+			return err
+		}
+		if argv.JsonLogs {
+			log.Logger = log.Output(zerolog.New(os.Stderr).With().Timestamp().Caller().Logger())
+		} else {
+			log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		}
 		if err := runServer(argv); err != nil {
-			panic(err)
+			return err
 		}
 		return nil
 	}))
@@ -62,35 +75,39 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 	}
 	var reqBody requestBody
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		println(err.Error())
+		log.Err(err).Msg("Error decoding JSON body")
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
 
 	if reqBody.ResponseFormat != "wav" {
+		log.Warn().Str("response_format", reqBody.ResponseFormat).Msg("Unsupported response format")
 		http.Error(w, "Unsupported response format (only 'wav' is supported)", http.StatusBadRequest)
 		return
 	}
 
 	if reqBody.StreamFormat != "" && reqBody.StreamFormat != "audio" {
+		log.Warn().Str("stream_format", reqBody.StreamFormat).Msg("Unsupported stream format")
 		http.Error(w, "Unsupported stream format (only 'audio' is supported)", http.StatusBadRequest)
 		return
 	}
 
 	if reqBody.Speed < 0 || reqBody.Speed > 4 {
+		log.Warn().Float64("speed", reqBody.Speed).Msg("Invalid speed")
 		http.Error(w, "Invalid speed (must be between 0 and 4)", http.StatusBadRequest)
 		return
 	}
 
 	inputVoice := strings.TrimPrefix(reqBody.Model, "tts-loquendo-")
 	if inputVoice == "" {
+		log.Warn().Str("model", reqBody.Model).Msg("Invalid model")
 		http.Error(w, "Invalid model", http.StatusBadRequest)
 		return
 	}
 
 	loq, err := loquendo.NewTTS(nil)
 	if err != nil {
-		println(err.Error())
+		log.Err(err).Msg("Error initializing TTS engine")
 		http.Error(w, "TTS engine error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -102,7 +119,7 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 
 	voices, err := loq.GetVoices()
 	if err != nil {
-		println(err.Error())
+		log.Err(err).Msg("Error retrieving available voices from TTS engine")
 		http.Error(w, "TTS engine error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -116,6 +133,7 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if voice == "" {
+		log.Warn().Str("voice", inputVoice).Msg("Voice not found")
 		http.Error(w, "Requested voice not found: "+inputVoice, http.StatusNotFound)
 		return
 	}
@@ -126,14 +144,14 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		// To:   [0, 100]
 		mappedSpeed = int32(100 * (math.Log2(reqBody.Speed) + 2) / 4)
 	}
-	fmt.Printf("Speed: %f -> %d\n", reqBody.Speed, mappedSpeed)
+	log.Debug().Float64("from", reqBody.Speed).Int32("to", mappedSpeed).Msg("Mapped speed")
 
 	dataChan, err := loq.SpeakStreaming(reqBody.Input, &loquendo.SpeechOptions{
 		Voice: voice,
 		Speed: &mappedSpeed,
 	})
 	if err != nil {
-		println(err.Error())
+		log.Err(err).Msg("Error starting TTS streaming")
 		http.Error(w, "TTS engine error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -142,8 +160,7 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	for chunk := range dataChan {
 		if _, err := w.Write(chunk); err != nil {
-			println(err.Error())
-			fmt.Printf("Error writing audio chunk to response: %v\n", err)
+			log.Err(err).Msg("Error writing audio chunk to response")
 			return
 		}
 		if f, ok := w.(http.Flusher); ok {
@@ -158,10 +175,7 @@ func runServer(argv *argT) error {
 	if err != nil {
 		return err
 	}
-	println("Available voices:")
-	for _, v := range voices {
-		println(" -", v.Id)
-	}
+	log.Debug().Str("voices", fmt.Sprintf("%+v", voices)).Msg("Available voices")
 
 	models := make(map[string]any)
 	data := make([]map[string]string, 0)
@@ -183,6 +197,7 @@ func runServer(argv *argT) error {
 			if argv.ApiKey != "" {
 				key := r.Header.Get("Authorization")
 				if key != "Bearer "+argv.ApiKey {
+					log.Warn().Str("key", key).Msg("Invalid API key")
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
@@ -202,7 +217,7 @@ func runServer(argv *argT) error {
 	})))
 
 	webFS := mustSub(webContent, "web")
-	mux.Handle("GET /web/", http.StripPrefix("/web/", http.FileServer(http.FS(webFS))))
+	mux.Handle("GET /web/", cacheStatic(http.StripPrefix("/web/", http.FileServer(http.FS(webFS)))))
 
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/web/", http.StatusFound)
@@ -223,12 +238,12 @@ func runServer(argv *argT) error {
 
 	logRequestsMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Printf("%s %s\n", r.Method, r.URL.Path)
+			log.Info().Str("method", r.Method).Str("url", r.URL.Path).Msg("Request received")
 			next.ServeHTTP(w, r)
 		})
 	}
 
-	fmt.Printf("Starting server on %s...\n", argv.BindAddr)
+	log.Info().Str("addr", argv.BindAddr).Msg("Starting server")
 	if err := http.ListenAndServe(argv.BindAddr, logRequestsMiddleware(corsMiddleware(mux))); err != nil {
 		return err
 	}
@@ -239,47 +254,9 @@ func runServer(argv *argT) error {
 func mustSub(fsys fs.FS, dir string) fs.FS {
 	sub, err := fs.Sub(fsys, dir)
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("dir", dir).Msg("Error creating sub filesystem")
 	}
 	return sub
-}
-
-func serveEmbeddedFile(w http.ResponseWriter, name, ctype string) {
-	b, err := webContent.ReadFile(name)
-	if err != nil {
-		http.NotFound(w, nil)
-		return
-	}
-	if ctype != "" {
-		w.Header().Set("Content-Type", ctype)
-	}
-	_, _ = w.Write(b)
-}
-
-func exists(fsys fs.FS, name string) bool {
-	f, err := fsys.Open(name)
-	if err != nil {
-		return false
-	}
-	_ = f.Close()
-	return true
-}
-
-func contentType(filename string) string {
-	switch strings.ToLower(path.Ext(filename)) {
-	case ".html":
-		return "text/html; charset=utf-8"
-	case ".js":
-		return "application/javascript; charset=utf-8"
-	case ".css":
-		return "text/css; charset=utf-8"
-	case ".svg":
-		return "image/svg+xml"
-	case ".png":
-		return "image/png"
-	default:
-		return "application/octet-stream"
-	}
 }
 
 func cacheStatic(next http.Handler) http.Handler {

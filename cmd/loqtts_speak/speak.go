@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"loq7tts-server/loquendo"
+	"loq7tts-server/pkg/utils"
 	"os"
 	"runtime/debug"
 
 	"github.com/mkideal/cli"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type argT struct {
@@ -19,6 +22,7 @@ type argT struct {
 	ListVoices bool   `cli:"l,list-voices" usage:"List available voices" dft:"false"`
 	JsonOutput bool   `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
 	Output     string `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
+	LogLevel   string `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
 	DebugTTS   bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
 	Version    bool   `cli:"V,version" usage:"show version information" dft:"false"`
 }
@@ -26,6 +30,11 @@ type argT struct {
 func main() {
 	os.Exit(cli.Run(new(argT), func(ctx *cli.Context) error {
 		argv := ctx.Argv().(*argT)
+
+		if err := utils.SetLogLevel(argv.LogLevel); err != nil {
+			return err
+		}
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		if argv.Version {
 			goLibVersion := "unknown"
@@ -36,7 +45,6 @@ func main() {
 
 			loqVersion, err := loquendo.GetVersionInfo()
 			if err != nil {
-				println("error")
 				return err
 			}
 

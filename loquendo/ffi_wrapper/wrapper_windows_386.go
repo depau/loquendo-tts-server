@@ -216,7 +216,6 @@ func (l *TTSLibrary) TTSGetVersionInfo() (string, error) {
 	var buf [512]byte
 	rc, _, _ := l.executor.CallProc(l.ttsGetVersionInfo, uintptr(unsafe.Pointer(&buf[0])))
 	if err := l.wrapErr(TTSResult(rc)); err != nil {
-		println("aaaa")
 		return "", err
 	}
 	return windows.BytePtrToString(&buf[0]), nil

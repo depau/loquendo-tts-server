@@ -14,6 +14,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/transform"
 
@@ -60,7 +61,7 @@ func InitEngineDLL(dllPath *string) (err error) {
 			return fmt.Errorf("error finding engine DLL path: %v", err)
 		}
 	}
-	fmt.Printf("loading engine DLL from '%s'\n", path)
+	log.Debug().Str("path", path).Msg("loading engine DLL")
 	ttsLib, err = ffi_wrapper.LoadEngineDLL(path)
 	return err
 }
@@ -72,7 +73,7 @@ func GetVersionInfo() (string, error) {
 		}
 	}
 	if ttsLib == nil {
-		panic("tts library not initialized")
+		log.Panic().Msg("tts library not initialized")
 	}
 	return ttsLib.TTSGetVersionInfo()
 }
@@ -84,7 +85,7 @@ func NewTTS(iniFile *string) (*TTS, error) {
 		}
 	}
 	if ttsLib == nil {
-		panic("tts library not initialized")
+		log.Panic().Msg("tts library not initialized")
 	}
 
 	session, err := ttsLib.TTSNewSession(iniFile)
@@ -230,10 +231,10 @@ func ttsCallbackWrapper(promptID uint32, eventType ffi_wrapper.TTSEventType, iDa
 
 func (t *TTS) ttsCallback(promptID uint32, eventType ffi_wrapper.TTSEventType, iData uintptr) {
 	if promptID != t.currentPromptID {
-		fmt.Printf("warning: received callback for prompt ID %d, but current prompt ID is %d\n", promptID, t.currentPromptID)
+		log.Warn().Uint32("promptID", promptID).Uint32("currentPromptID", t.currentPromptID).Msg("received callback for prompt ID that does not match current prompt ID")
 	}
 	if t.debugEvents {
-		fmt.Printf("tts callback for prompt ID %d: %s\n", promptID, ffi_wrapper.TTSDescribeEvent(eventType, iData))
+		log.Debug().Uint32("promptID", promptID).Str("event", ffi_wrapper.TTSDescribeEvent(eventType, iData)).Msg("tts callback")
 	}
 }
 
@@ -279,7 +280,7 @@ func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte
 	go func() {
 		conn, err := t.pipe.Accept()
 		if err != nil {
-			panic(fmt.Sprintf("error accepting connection on pipe: %v", err))
+			log.Panic().Err(err).Msg("error accepting connection on pipe")
 		}
 
 		defer func() {
@@ -288,7 +289,7 @@ func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte
 			close(t.speechChannel)
 			t.pipe = nil
 			t.speechChannel = nil
-			fmt.Printf("closed pipe for prompt ID %d\n", t.currentPromptID)
+			log.Trace().Str("pipe", pipeName).Msg("pipe closed")
 		}()
 
 		buf := make([]byte, 4096)
@@ -299,10 +300,10 @@ func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte
 					return
 				}
 				if errors.Is(err, os.ErrClosed) {
-					fmt.Printf("pipe closed, ending read loop for prompt ID %d\n", t.currentPromptID)
+					log.Debug().Str("pipe", pipeName).Msg("pipe closed, ending read loop")
 					return
 				}
-				panic(fmt.Sprintf("error reading from pipe: %v", err))
+				log.Panic().Err(err).Msg("error reading from pipe")
 			}
 			if n > 0 {
 				chunk := make([]byte, n)
