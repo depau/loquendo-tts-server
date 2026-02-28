@@ -128,6 +128,12 @@ func NewTTS(iniFile *string) (*TTS, error) {
 		return nil, fmt.Errorf("error setting TTS callback: %v", err)
 	}
 
+	// Disable \@Key=Val tag parsing by default
+	if err = ttsLib.TTSSetParam(reader, "TaggedText", "FALSE"); err != nil {
+		_ = res.Close()
+		return nil, fmt.Errorf("error setting TTS tagged text parameter: %v", err)
+	}
+
 	return res, nil
 }
 
