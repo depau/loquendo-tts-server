@@ -16,15 +16,16 @@ import (
 
 type argT struct {
 	cli.Helper
-	Text       string `cli:"t,text" usage:"Text to speak, - for stdin. Default: the voice's demo sentence" dft:""`
-	Voice      string `cli:"v,voice" usage:"Voice to use"`
-	Speed      int32  `cli:"s,speed" usage:"Speech speed in the range 0-100. Default: 50" dft:"50"`
-	ListVoices bool   `cli:"l,list-voices" usage:"List available voices" dft:"false"`
-	JsonOutput bool   `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
-	Output     string `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
-	LogLevel   string `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
-	DebugTTS   bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
-	Version    bool   `cli:"V,version" usage:"show version information" dft:"false"`
+	Text       string            `cli:"t,text" usage:"Text to speak, - for stdin. Default: the voice's demo sentence" dft:""`
+	Voice      string            `cli:"v,voice" usage:"Voice to use"`
+	Speed      int32             `cli:"s,speed" usage:"Speech speed in the range 0-100. Default: 50" dft:"50"`
+	ListVoices bool              `cli:"l,list-voices" usage:"List available voices" dft:"false"`
+	Params     map[string]string `cli:"p,param" usage:"Set a parameter for the voice engine (can be used multiple times), i.e. -pAutoGuess=\"VoiceSentence:Italian,English\"" dft:""`
+	JsonOutput bool              `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
+	Output     string            `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
+	LogLevel   string            `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
+	DebugTTS   bool              `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
+	Version    bool              `cli:"V,version" usage:"show version information" dft:"false"`
 }
 
 func main() {
@@ -131,6 +132,13 @@ func main() {
 				return err
 			}
 			text = string(bytes)
+		}
+
+		for k, v := range argv.Params {
+			log.Trace().Str("key", k).Str("value", v).Msg("Setting parameter")
+			if err := loq.SetParam(k, v); err != nil {
+				return err
+			}
 		}
 
 		dataChan, err := loq.SpeakStreaming(text, &loquendo.SpeechOptions{
