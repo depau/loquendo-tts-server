@@ -154,6 +154,14 @@ func (l *TTSLibrary) TTSSetCallback(reader TTSHandle, callback TTSCallbackFuncti
 	return l.wrapErr(TTSResult(rc))
 }
 
+func (l *TTSLibrary) TTSSetSpeed(reader TTSHandle, speed int32) error {
+	rc, _, _ := l.executor.CallProc(l.ttsSetSpeed,
+		uintptr(reader),
+		uintptr(speed),
+	)
+	return l.wrapErr(TTSResult(rc))
+}
+
 func (l *TTSLibrary) TTSQuery(session TTSHandle, queryType TTSQueryType, dataToRetrieve string, filter *string, resultBuffer *[]byte, loadedOnly bool, rescanFileSystem bool) error {
 	if resultBuffer == nil || len(*resultBuffer) == 0 {
 		return errors.New("resultBuffer must be a non-empty byte slice")

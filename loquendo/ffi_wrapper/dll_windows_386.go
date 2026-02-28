@@ -96,6 +96,14 @@ type TTSLibrary struct {
 	ttsSetCallback *windows.Proc
 
 	/*
+		ttsResultType tts_API_DEFINITION ttsSetSpeed(
+		    ttsHandleType hReader,
+		    int value
+		);
+	*/
+	ttsSetSpeed *windows.Proc
+
+	/*
 		ttsResultType tts_API_DEFINITION ttsQuery(
 		    ttsHandleType hSession,
 		    ttsQueryType uObject,
@@ -210,6 +218,9 @@ func LoadEngineDLL(dllPath string) (*TTSLibrary, error) {
 		return nil, err
 	}
 	if lib.ttsSetCallback, err = mustProc("ttsSetCallback"); err != nil {
+		return nil, err
+	}
+	if lib.ttsSetSpeed, err = mustProc("ttsSetSpeed"); err != nil {
 		return nil, err
 	}
 	if lib.ttsQuery, err = mustProc("ttsQuery"); err != nil {

@@ -15,6 +15,7 @@ type argT struct {
 	cli.Helper
 	Text       string `cli:"t,text" usage:"Text to speak, - for stdin. Default: the voice's demo sentence" dft:""`
 	Voice      string `cli:"v,voice" usage:"Voice to use"`
+	Speed      int32  `cli:"s,speed" usage:"Speech speed in the range 0-100. Default: 50" dft:"50"`
 	ListVoices bool   `cli:"l,list-voices" usage:"List available voices" dft:"false"`
 	JsonOutput bool   `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
 	Output     string `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
@@ -120,7 +121,10 @@ func main() {
 			text = string(bytes)
 		}
 
-		dataChan, err := loq.SpeakStreaming(text, voiceId)
+		dataChan, err := loq.SpeakStreaming(text, &loquendo.SpeechOptions{
+			Voice: voiceId,
+			Speed: &argv.Speed,
+		})
 		if err != nil {
 			return err
 		}

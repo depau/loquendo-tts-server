@@ -237,7 +237,12 @@ func (t *TTS) ttsCallback(promptID uint32, eventType ffi_wrapper.TTSEventType, i
 	}
 }
 
-func (t *TTS) SpeakStreaming(text string, voice string) (<-chan []byte, error) {
+type SpeechOptions struct {
+	Voice string `json:"voice"`
+	Speed *int32 `json:"speed"`
+}
+
+func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte, error) {
 	var err error
 
 	if t.currentPromptID != 0 {
@@ -255,8 +260,17 @@ func (t *TTS) SpeakStreaming(text string, voice string) (<-chan []byte, error) {
 		return nil, fmt.Errorf("error setting audio output: %v", err)
 	}
 
-	if err = ttsLib.TTSLoadPersona(t.phReader, voice, nil); err != nil {
-		return nil, fmt.Errorf("error loading persona: %v", err)
+	if options != nil {
+		if err = ttsLib.TTSLoadPersona(t.phReader, options.Voice, nil); err != nil {
+			return nil, fmt.Errorf("error loading persona: %v", err)
+		}
+		var speed int32 = 50
+		if options.Speed != nil {
+			speed = *options.Speed
+		}
+		if err = ttsLib.TTSSetSpeed(t.phReader, speed); err != nil {
+			return nil, fmt.Errorf("error setting speed: %v", err)
+		}
 	}
 
 	ch := make(chan []byte)

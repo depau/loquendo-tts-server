@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"loq7tts-server/loquendo"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -56,7 +57,7 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		_              any     `json:"voice"`
 		_              string  `json:"instructions"`
 		ResponseFormat string  `json:"response_format"`
-		Speed          float64 `json:"speed"`
+		Speed          float64 `json:"speed" default:"1.0"`
 		StreamFormat   string  `json:"stream_format"`
 	}
 	var reqBody requestBody
@@ -73,6 +74,11 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 
 	if reqBody.StreamFormat != "" && reqBody.StreamFormat != "audio" {
 		http.Error(w, "Unsupported stream format (only 'audio' is supported)", http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.Speed < 0 || reqBody.Speed > 4 {
+		http.Error(w, "Invalid speed (must be between 0 and 4)", http.StatusBadRequest)
 		return
 	}
 
@@ -114,7 +120,18 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dataChan, err := loq.SpeakStreaming(reqBody.Input, voice)
+	var mappedSpeed int32 = 50
+	if reqBody.Speed != 1 {
+		// Map:  2^x, with x in [-2, +2]
+		// To:   [0, 100]
+		mappedSpeed = int32(100 * (math.Log2(reqBody.Speed) + 2) / 4)
+	}
+	fmt.Printf("Speed: %f -> %d\n", reqBody.Speed, mappedSpeed)
+
+	dataChan, err := loq.SpeakStreaming(reqBody.Input, &loquendo.SpeechOptions{
+		Voice: voice,
+		Speed: &mappedSpeed,
+	})
 	if err != nil {
 		println(err.Error())
 		http.Error(w, "TTS engine error: "+err.Error(), http.StatusInternalServerError)
