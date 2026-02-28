@@ -12,6 +12,7 @@ import (
 	"github.com/mkideal/cli"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/term"
 )
 
 type argT struct {
@@ -22,7 +23,7 @@ type argT struct {
 	ListVoices bool              `cli:"l,list-voices" usage:"List available voices" dft:"false"`
 	Params     map[string]string `cli:"p,param" usage:"Set a parameter for the voice engine (can be used multiple times), i.e. -pAutoGuess=\"VoiceSentence:Italian,English\"" dft:""`
 	JsonOutput bool              `cli:"j,json" usage:"Output JSON instead of plain text (for list-voices)" dft:"false"`
-	Output     string            `cli:"o,output" usage:"Output file name, - for stdout" dft:"-"`
+	Output     string            `cli:"o,output" usage:"Output file name, - for stdout" dft:""`
 	LogLevel   string            `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
 	DebugTTS   bool              `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
 	Version    bool              `cli:"V,version" usage:"show version information" dft:"false"`
@@ -150,7 +151,13 @@ func main() {
 		}
 
 		var output io.Writer
-		if argv.Output == "-" {
+		if argv.Output == "" {
+			if term.IsTerminal(int(os.Stdout.Fd())) {
+				//goland:noinspection GoErrorStringFormat
+				return fmt.Errorf("Binary output can mess up your terminal. Use -o - to write to stdout anyway, or specify an output file with -o <filename>")
+			}
+			output = os.Stdout
+		} else if argv.Output == "-" {
 			output = os.Stdout
 		} else {
 			output, err = os.Create(argv.Output)
