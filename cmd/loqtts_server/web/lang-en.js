@@ -4,12 +4,12 @@ window.translations.en = {
     // Headers and main elements
     title: "🚉 Loquendo TTS 🚅",
     pageTitle: "Loquendo TTS Client",
-    
+
     // Information blocks
     modelInfo: {
         title: "💡 Voice Information:",
     },
-    
+
     // Forms and fields
     form: {
         apiKey: "🔑 API Key",
@@ -20,7 +20,7 @@ window.translations.en = {
         speed: "⚡ Speech Speed",
         generateBtn: "🎤 Generate Speech"
     },
-    
+
     // Model options
     models: {
         loading: "Loading models...",
@@ -35,14 +35,14 @@ window.translations.en = {
 
     // Audio formats
     formats: {
-        // mp3: "MP3 (default)",
-        // opus: "Opus (low latency)",
-        // aac: "AAC (YouTube, mobile)",
-        // flac: "FLAC (lossless)",
+        mp3: "MP3 (default)",
+        opus: "OGG/Vorbis",
+        aac: "AAC (YouTube, mobile)",
+        flac: "FLAC (lossless)",
         wav: "WAV (low latency)",
         // pcm: "PCM (raw data)"
     },
-    
+
     // Loading and progress
     loading: {
         preparing: "Preparing request...",
@@ -57,13 +57,13 @@ window.translations.en = {
         downloadingAudio: "Downloading audio data...",
         ready: "Ready!"
     },
-    
+
     // Results
     result: {
         title: "✅ Audio ready!",
         download: "⬇️ Download audio"
     },
-    
+
     // Errors
     errors: {
         title: "❌ Error:",
@@ -71,7 +71,7 @@ window.translations.en = {
         textTooLong: "Text too long! Maximum 4096 characters.",
         loadModels: "Failed to load voices"
     },
-    
+
     // Units
     units: {
         characters: "characters",

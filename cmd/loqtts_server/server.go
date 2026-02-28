@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -23,11 +24,12 @@ var webContent embed.FS
 
 type argT struct {
 	cli.Helper
-	BindAddr string `cli:"a,addr" usage:"address to listen on" dft:":8080"`
-	DebugTTS bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
-	ApiKey   string `cli:"k,apikey" usage:"API key for authentication" dft:""`
-	LogLevel string `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
-	JsonLogs bool   `cli:"j,json-logs" usage:"Output JSON logs instead of plain text" dft:"false"`
+	BindAddr   string `cli:"a,addr" usage:"address to listen on" dft:":8080"`
+	DebugTTS   bool   `cli:"d,debug" usage:"enable debug logging for TTS engine events" dft:"false"`
+	ApiKey     string `cli:"k,apikey" usage:"API key for authentication" dft:""`
+	FfmpegPath string `cli:"ffmpeg-path" usage:"Path to ffmpeg executable" dft:"ffmpeg"`
+	LogLevel   string `cli:"log-level" usage:"Log level (trace, debug, info, warn, error, fatal, panic)" dft:"info"`
+	JsonLogs   bool   `cli:"j,json-logs" usage:"Output JSON logs instead of plain text" dft:"false"`
 }
 
 func main() {
@@ -63,13 +65,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
+func serveSpeech(debugTTS bool, ffmpegPath string, w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
 		Input          string  `json:"input"`
 		Model          string  `json:"model"`
 		_              any     `json:"voice"`
-		Instructions   string  `json:"instructions"`
-		ResponseFormat string  `json:"response_format"`
+		Instructions   string  `json:"instructions" default:""`
+		ResponseFormat string  `json:"response_format" default:"mp3"`
 		Speed          float64 `json:"speed" default:"1.0"`
 		StreamFormat   string  `json:"stream_format"`
 	}
@@ -80,15 +82,15 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if reqBody.ResponseFormat != "wav" {
+	if !slices.Contains([]string{"mp3", "opus", "aac", "flac", "wav"}, reqBody.ResponseFormat) {
 		log.Warn().Str("response_format", reqBody.ResponseFormat).Msg("Unsupported response format")
-		http.Error(w, "Unsupported response format (only 'wav' is supported)", http.StatusBadRequest)
+		http.Error(w, "Unsupported response format", http.StatusBadRequest)
 		return
 	}
 
 	if reqBody.StreamFormat != "" && reqBody.StreamFormat != "audio" {
 		log.Warn().Str("stream_format", reqBody.StreamFormat).Msg("Unsupported stream format")
-		http.Error(w, "Unsupported stream format (only 'audio' is supported)", http.StatusBadRequest)
+		http.Error(w, "Unsupported stream format (only 'audio' is supported)", http.StatusNotImplemented)
 		return
 	}
 
@@ -176,7 +178,24 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "audio/wav")
+	mimeType := fmt.Sprintf("audio/%s", reqBody.ResponseFormat)
+	fileExt := reqBody.ResponseFormat
+	if reqBody.ResponseFormat == "ogg" {
+		mimeType = "audio/ogg"
+		fileExt = "oga"
+	}
+	if reqBody.ResponseFormat != "wav" {
+		newChan, err := TranscodeAudio(dataChan, reqBody.ResponseFormat, ffmpegPath)
+		if err != nil {
+			log.Error().Err(err).Msg("Error transcoding audio")
+			http.Error(w, "Error transcoding audio", http.StatusInternalServerError)
+			return
+		}
+		dataChan = newChan
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=tts.%s", fileExt))
 	w.WriteHeader(http.StatusOK)
 	for chunk := range dataChan {
 		if _, err := w.Write(chunk); err != nil {
@@ -233,7 +252,7 @@ func runServer(argv *argT) error {
 	})
 
 	mux.Handle("POST /v1/audio/speech", apiKeyMiddleware(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		serveSpeech(argv.DebugTTS, writer, request)
+		serveSpeech(argv.DebugTTS, argv.FfmpegPath, writer, request)
 	})))
 
 	webFS := mustSub(webContent, "web")
