@@ -195,6 +195,23 @@ func (l *TTSLibrary) TTSQuery(session TTSHandle, queryType TTSQueryType, dataToR
 	return nil
 }
 
+func (l *TTSLibrary) TTSSetParam(readerOrSession TTSHandle, name, value string) error {
+	namePtr, err := windows.BytePtrFromString(name)
+	if err != nil {
+		return err
+	}
+	valuePtr, err := windows.BytePtrFromString(value)
+	if err != nil {
+		return err
+	}
+	rc, _, _ := l.executor.CallProc(l.ttsSetParam,
+		uintptr(readerOrSession),
+		uintptr(unsafe.Pointer(namePtr)),
+		uintptr(unsafe.Pointer(valuePtr)),
+	)
+	return l.wrapErr(TTSResult(rc))
+}
+
 func (l *TTSLibrary) TTSGetPCM(object TTSHandle) (buffer []byte, complete bool, err error) {
 	var bufferPtr uintptr
 	var numSamplesOut uint32

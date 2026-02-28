@@ -118,6 +118,15 @@ type TTSLibrary struct {
 	ttsQuery *windows.Proc
 
 	/*
+		ttsResultType tts_API_DEFINITION ttsSetParam(
+		    ttsHandleType hObject,
+		    const char * sName,
+		    const char * sValue
+		);
+	*/
+	ttsSetParam *windows.Proc
+
+	/*
 		ttsResultType tts_API_DEFINITION ttsGetPCM(
 		    ttsHandleType hObject,
 		    const void **pBuffer,  // out
@@ -224,6 +233,9 @@ func LoadEngineDLL(dllPath string) (*TTSLibrary, error) {
 		return nil, err
 	}
 	if lib.ttsQuery, err = mustProc("ttsQuery"); err != nil {
+		return nil, err
+	}
+	if lib.ttsSetParam, err = mustProc("ttsSetParam"); err != nil {
 		return nil, err
 	}
 	if lib.ttsGetPCM, err = mustProc("ttsGetPCM"); err != nil {

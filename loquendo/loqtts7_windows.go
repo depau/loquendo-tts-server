@@ -223,7 +223,16 @@ func (t *TTS) GetVoices() ([]Voice, error) {
 	return voices, nil
 }
 
+func (t *TTS) SetParam(name, value string) error {
+	err := ttsLib.TTSSetParam(t.phReader, name, value)
+	if err != nil {
+		return fmt.Errorf("error setting TTS parameter: %v", err)
+	}
+	return nil
+}
+
 func ttsCallbackWrapper(promptID uint32, eventType ffi_wrapper.TTSEventType, iData uintptr, pUser uintptr) uint32 {
+	//goland:noinspection GoVetUnsafePointer
 	t := (*TTS)(unsafe.Pointer(pUser))
 	t.ttsCallback(promptID, eventType, iData)
 	return 0
