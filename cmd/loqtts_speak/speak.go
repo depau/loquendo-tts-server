@@ -106,6 +106,10 @@ func main() {
 			return nil
 		}
 
+		if argv.Voice == "" {
+			return fmt.Errorf("voice not specified")
+		}
+
 		voiceId := argv.Voice
 		var voice *loquendo.Voice = nil
 		for _, v := range voices {
