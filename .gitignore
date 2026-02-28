@@ -30,4 +30,9 @@ go.work.sum
 .vscode/
 
 *.wav
+*.mp3
+*.ogg
+*.flac
+*.aac
+*.opus
 ffmpeg*/
