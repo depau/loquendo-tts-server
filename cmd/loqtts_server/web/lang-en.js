@@ -12,14 +12,12 @@ window.translations.en = {
     
     // Forms and fields
     form: {
-        apiKey: "🔑 OpenAI API Key",
-        apiKeyPlaceholder: "sk-...",
+        apiKey: "🔑 API Key",
         model: "🤖 TTS Voice",
         text: "📝 Text to Speech",
         textPlaceholder: "Enter text to convert to speech...",
         format: "🎧 Audio Format",
         speed: "⚡ Speech Speed",
-        speedHint: "For GPT models use instructions above",
         generateBtn: "🎤 Generate Speech"
     },
     

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenAI TTS Client</title>
+    <title>Loquendo TTS Client</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,8 +15,8 @@
         <form id="ttsForm">
             <!-- API key -->
             <div class="form-group">
-                <label for="apiKey" data-translate="form.apiKey">🔑 OpenAI API Key</label>
-                <input type="password" id="apiKey" data-translate-placeholder="form.apiKeyPlaceholder">
+                <label for="apiKey" data-translate="form.apiKey">🔑 API Key</label>
+                <input type="password" id="apiKey">
             </div>
 
             <!-- TTS model -->
@@ -51,14 +51,13 @@
 
             <!-- Speech speed for legacy models -->
             <div class="form-group" id="speedGroup">
-                <label for="speed" data-translate="form.speed">⚡ Speech Speed (legacy models only)</label>
+                <label for="speed" data-translate="form.speed">⚡ Speech Speed</label>
                 <div class="speed-container">
                     <span>0.25x</span>
                     <input type="range" id="speed" min="0.25" max="4.0" step="0.05" value="1.0">
                     <span>4.0x</span>
                     <div class="speed-value">1.0x</div>
                 </div>
-                <small style="color: #666; font-size: 12px;" data-translate="form.speedHint">For GPT models use instructions above</small>
             </div>
 
             <!-- Generate button -->

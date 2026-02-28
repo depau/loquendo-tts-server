@@ -241,7 +241,7 @@ class TTSClient {
             // Add parameters based on model capabilities
             requestData.speed = speed;
 
-            console.log('Sending request to OpenAI:', requestData);
+            console.log('Sending request to server:', requestData);
             this.updateProgress(15, this.t('loading.connecting'), `${this.t('units.model')} ${model}`);
 
             const response = await fetch('../v1/audio/speech', {
