@@ -68,7 +68,7 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		Input          string  `json:"input"`
 		Model          string  `json:"model"`
 		_              any     `json:"voice"`
-		_              string  `json:"instructions"`
+		Instructions   string  `json:"instructions"`
 		ResponseFormat string  `json:"response_format"`
 		Speed          float64 `json:"speed" default:"1.0"`
 		StreamFormat   string  `json:"stream_format"`
@@ -145,6 +145,26 @@ func serveSpeech(debugTTS bool, w http.ResponseWriter, r *http.Request) {
 		mappedSpeed = int32(100 * (math.Log2(reqBody.Speed) + 2) / 4)
 	}
 	log.Debug().Float64("from", reqBody.Speed).Int32("to", mappedSpeed).Msg("Mapped speed")
+
+	for _, line := range strings.Split(reqBody.Instructions, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			log.Warn().Str("line", line).Msg("Invalid instruction line (expected 'key=value')")
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		log.Debug().Str("key", key).Str("value", value).Msg("Setting TTS parameter from instructions")
+		if err := loq.SetParam(key, value); err != nil {
+			log.Warn().Err(err).Str("key", key).Str("value", value).Msg("Error setting TTS parameter")
+			http.Error(w, fmt.Sprintf("Invalid TTS parameter in instructions: '%s'", line), http.StatusBadRequest)
+			return
+		}
+	}
 
 	dataChan, err := loq.SpeakStreaming(reqBody.Input, &loquendo.SpeechOptions{
 		Voice: voice,
