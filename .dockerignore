@@ -37,3 +37,4 @@ go.work.sum
 *.opus
 
 ffmpeg*/
+!ffmpeg_wrapper/

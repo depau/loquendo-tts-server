@@ -1,0 +1,29 @@
+ARG BASE_TAG="ghcr.io/depau/loquendo-tts-server"
+
+###############################################
+FROM alpine:3.23 AS downloader
+
+RUN mkdir /dl && \
+    apk add curl && \
+    curl -L -o /dl/roberto.exe "https://archive.org/download/text-to-speech-oddcast-voices-pack-2024/Loquendo%207/Raffaele%20-%20Italian.exe"
+
+COPY docker/license.reg /dl/license.reg
+
+###############################################
+FROM $BASE_TAG/server:latest
+
+USER wineuser
+
+RUN --mount=type=bind,from=downloader,source=/dl,target=/mnt \
+    source auto_xvfb && \
+    wine /mnt/roberto.exe /VERYSILENT & \
+    sleep 1 && while ! pkill "REGVOICE.EXE"; do sleep 1; done && \
+    echo "Killed registration process." && \
+    wineboot -k && \
+    wine reg delete 'HKEY_LOCAL_MACHINE\Software\Wow6432Node\Loquendo\LTTS7\LicenseCode' /f && \
+    wine reg import /mnt/license.reg && \
+    wineserver -k
+
+# We need to run as root so the entrypoint can set up the dummy network interface for the license checks
+# The entrypoint will drop privileges to the wineuser before starting the server
+USER root

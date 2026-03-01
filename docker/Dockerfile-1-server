@@ -1,0 +1,43 @@
+###############################################
+FROM golang:1.26 AS builder
+
+COPY --exclude=scripts --exclude=Dockerfile --exclude=*ignore --exclude=docker \
+  . /project
+WORKDIR /project
+
+RUN mkdir /app && \
+    GOOS=windows GOARCH=386 go build -o /app/loqtts_server.exe ./cmd/loqtts_server/
+
+###############################################
+FROM alpine:3.23 AS downloader
+
+RUN mkdir /dl && \
+    apk add curl unzip && \
+    curl -L -o /dl/bridge.zip "https://github.com/depau/wine-unix-bridge/releases/download/v1.1/wine_unix_bridge-linux-x64.zip" && \
+    unzip /dl/bridge.zip -d /dl && \
+    ls -lah /dl
+
+###############################################
+FROM ghcr.io/depau/wine-docker:latest
+LABEL org.opencontainers.image.authors="Davide Depau <davide@depau.eu>"
+
+USER root
+
+RUN export DPKG_FRONTEND=noninteractive && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends iproute2 procps gosu ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=downloader /dl/unixbridge.dll /app/unixbridge.dll
+COPY --from=downloader /dl/unixbridge.exe /app/ffmpeg.exe
+
+COPY scripts/root_entrypoint.sh /usr/local/bin/root_entrypoint.sh
+COPY scripts/unprivileged_entrypoint.sh /usr/local/bin/unprivileged_entrypoint.sh
+
+COPY --from=builder /app/ /app/
+
+USER wineuser
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/root_entrypoint.sh", "wine", "/app/loqtts_server.exe", "--ffmpeg-path", "Z:\\app\\ffmpeg.exe"]
+CMD []
