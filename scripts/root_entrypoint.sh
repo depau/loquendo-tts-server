@@ -26,8 +26,9 @@ if ip link show | grep -iq "$MAC_ADDR" >/dev/null 2>&1; then
 fi
 
 if [[ "$EUID" != 0 ]]; then
-  echo "WARNING: running as non-root user, skipping network interface configuration"
-  run_unprivileged
+  echo "ERROR: running as non-root user, can't add dummy network interface with MAC address $MAC_ADDR" >&2
+  echo "For the voices license to work, you either need to run the container with --cap-add=NET_ADMIN or ensure that an interface with the MAC address '$MAC_ADDR' exists on the host" >&2
+  exit 1
 fi
 
 echo "Adding dummy network interface with MAC address $MAC_ADDR"
