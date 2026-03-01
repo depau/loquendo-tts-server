@@ -104,7 +104,7 @@ jobs:
 
   build-voices:
     name: Build Voices ${{ matrix.arch }}
-    needs: build-server
+    needs: merge-server
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
