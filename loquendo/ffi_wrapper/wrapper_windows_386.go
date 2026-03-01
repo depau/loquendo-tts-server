@@ -261,6 +261,7 @@ func findEngineLibPathFromRegistry() (string, error) {
 		`SOFTWARE\Loquendo\LTTS7\Engine`,
 		`SOFTWARE\Loquendo\LTTS7\SDK`,
 		`SOFTWARE\Loquendo\LTTS7\LoqSAPI5`,
+		`SOFTWARE\Loquendo\LTTS7\LoqSapi5`,
 		`SOFTWARE\Loquendo\LTTS7\default.session`,
 	} {
 		for _, root := range []registry.Key{registry.LOCAL_MACHINE, registry.CURRENT_USER} {
@@ -284,9 +285,14 @@ func findEngineLibPathFromRegistry() (string, error) {
 			}
 		}
 	}
-	fallback := `C:\Program Files (x86)\Loquendo\LTTS7\bin\LoqTTS7.dll`
-	if _, err := os.Stat(fallback); err == nil {
-		return filepath.Dir(fallback), nil
+	fallback := []string{
+		`C:\Program Files\Loquendo\LTTS7\bin\LoqTTS7.dll`,
+		`C:\Program Files (x86)\Loquendo\LTTS7\bin\LoqTTS7.dll`,
+	}
+	for _, path := range fallback {
+		if _, err := os.Stat(path); err == nil {
+			return filepath.Dir(path), nil
+		}
 	}
 	return "", errors.New("engine path not found")
 }

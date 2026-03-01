@@ -251,6 +251,9 @@ func (t *TTS) ttsCallback(promptID uint32, eventType ffi_wrapper.TTSEventType, i
 	if t.debugEvents {
 		log.Debug().Uint32("promptID", promptID).Str("event", ffi_wrapper.TTSDescribeEvent(eventType, iData)).Msg("tts callback")
 	}
+	if eventType == ffi_wrapper.TTSEventEndOfSpeech {
+		t.currentPromptID = 0
+	}
 }
 
 type SpeechOptions struct {
@@ -258,7 +261,7 @@ type SpeechOptions struct {
 	Speed *int32 `json:"speed"`
 }
 
-func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte, error) {
+func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (io.ReadCloser, error) {
 	var err error
 
 	if t.currentPromptID != 0 {
@@ -289,51 +292,16 @@ func (t *TTS) SpeakStreaming(text string, options *SpeechOptions) (<-chan []byte
 		}
 	}
 
-	ch := make(chan []byte)
-	t.speechChannel = ch
-
-	go func() {
-		conn, err := t.pipe.Accept()
-		if err != nil {
-			log.Panic().Err(err).Msg("error accepting connection on pipe")
-		}
-
-		defer func() {
-			_ = conn.Close()
-			_ = t.pipe.Close()
-			close(t.speechChannel)
-			t.pipe = nil
-			t.speechChannel = nil
-			log.Trace().Str("pipe", pipeName).Msg("pipe closed")
-		}()
-
-		buf := make([]byte, 4096)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				if errors.Is(err, os.ErrClosed) {
-					log.Debug().Str("pipe", pipeName).Msg("pipe closed, ending read loop")
-					return
-				}
-				log.Panic().Err(err).Msg("error reading from pipe")
-			}
-			if n > 0 {
-				chunk := make([]byte, n)
-				copy(chunk, buf[:n])
-				t.speechChannel <- chunk
-			}
-		}
-	}()
-
 	promptId, err := ttsLib.TTSRead(t.phReader, text, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("error starting TTS read: %v", err)
 	}
-
 	t.currentPromptID = promptId
 
-	return ch, nil
+	conn, err := t.pipe.Accept()
+	if err != nil {
+		log.Panic().Err(err).Msg("error accepting connection on pipe")
+	}
+
+	return conn, nil
 }

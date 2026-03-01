@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,15 +10,13 @@ import (
 )
 
 // TranscodeAudio transcodes the wave audio into the specified format using FFmpeg
-func TranscodeAudio(audioChan <-chan []byte, outFormat string, ffmpegPath string) (<-chan []byte, error) {
-	cmd := exec.Cmd{
-		Path:   "ffmpeg",
-		Args:   []string{"ffmpeg", "-i", "pipe:0"},
-		Stderr: os.Stderr,
-	}
-	if ffmpegPath != "" {
-		cmd.Path = ffmpegPath
-	}
+func TranscodeAudio(reader io.ReadCloser, outFormat string, ffmpegPath string) (io.ReadCloser, error) {
+	cmd := exec.Command(ffmpegPath, "-i", "pipe:0")
+	cmd.Stdin = reader
+	cmd.Stderr = os.Stderr
+	//if ffmpegPath != "" {
+	//	cmd.Path = ffmpegPath
+	//}
 
 	switch outFormat {
 	case "wav":
@@ -37,10 +34,6 @@ func TranscodeAudio(audioChan <-chan []byte, outFormat string, ffmpegPath string
 	}
 	cmd.Args = append(cmd.Args, "pipe:1")
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -52,39 +45,11 @@ func TranscodeAudio(audioChan <-chan []byte, outFormat string, ffmpegPath string
 	}
 
 	go func() {
-		for audio := range audioChan {
-			if _, err := stdin.Write(audio); err != nil && !errors.Is(err, io.ErrClosedPipe) {
-				log.Panic().Err(err).Msg("error writing to ffmpeg stdin")
-			}
+		if err := cmd.Wait(); err != nil {
+			log.Error().Err(err).Msg("ffmpeg exited with error")
 		}
-		err := stdin.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("error closing ffmpeg stdin")
-		}
-		log.Trace().Msg("ffmpeg stdin closed")
+		reader.Close()
 	}()
 
-	outChan := make(chan []byte)
-
-	go func() {
-		buf := make([]byte, 4096)
-		for {
-			n, err := stdout.Read(buf)
-			if n > 0 {
-				chunk := make([]byte, n)
-				copy(chunk, buf[:n])
-				outChan <- chunk
-			}
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				log.Panic().Err(err).Msg("error reading from ffmpeg stdout")
-			}
-		}
-		close(outChan)
-		log.Trace().Msg("ffmpeg stdout closed")
-	}()
-
-	return outChan, nil
+	return stdout, nil
 }

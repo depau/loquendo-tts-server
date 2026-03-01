@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"loq7tts-server/loquendo"
 	"loq7tts-server/pkg/utils"
@@ -168,7 +169,7 @@ func serveSpeech(debugTTS bool, ffmpegPath string, w http.ResponseWriter, r *htt
 		}
 	}
 
-	dataChan, err := loq.SpeakStreaming(reqBody.Input, &loquendo.SpeechOptions{
+	reader, err := loq.SpeakStreaming(reqBody.Input, &loquendo.SpeechOptions{
 		Voice: voice,
 		Speed: &mappedSpeed,
 	})
@@ -185,26 +186,25 @@ func serveSpeech(debugTTS bool, ffmpegPath string, w http.ResponseWriter, r *htt
 		fileExt = "oga"
 	}
 	if reqBody.ResponseFormat != "wav" {
-		newChan, err := TranscodeAudio(dataChan, reqBody.ResponseFormat, ffmpegPath)
+		newReader, err := TranscodeAudio(reader, reqBody.ResponseFormat, ffmpegPath)
 		if err != nil {
 			log.Error().Err(err).Msg("Error transcoding audio")
 			http.Error(w, "Error transcoding audio", http.StatusInternalServerError)
+			reader.Close()
 			return
 		}
-		dataChan = newChan
+		reader = newReader
 	}
+	defer reader.Close()
 
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=tts.%s", fileExt))
 	w.WriteHeader(http.StatusOK)
-	for chunk := range dataChan {
-		if _, err := w.Write(chunk); err != nil {
-			log.Err(err).Msg("Error writing audio chunk to response")
-			return
-		}
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
+
+	if _, err = io.Copy(w, reader); err != nil {
+		log.Error().Err(err).Msg("Error writing audio to response")
+		http.Error(w, "Error writing audio to response", http.StatusInternalServerError)
+		return
 	}
 }
 

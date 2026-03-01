@@ -142,13 +142,14 @@ func main() {
 			}
 		}
 
-		dataChan, err := loq.SpeakStreaming(text, &loquendo.SpeechOptions{
+		reader, err := loq.SpeakStreaming(text, &loquendo.SpeechOptions{
 			Voice: voiceId,
 			Speed: &argv.Speed,
 		})
 		if err != nil {
 			return err
 		}
+		defer reader.Close()
 
 		var output io.Writer
 		if argv.Output == "" {
@@ -166,13 +167,7 @@ func main() {
 			}
 			defer output.(*os.File).Close()
 		}
-
-		for chunk := range dataChan {
-			if _, err := output.Write(chunk); err != nil {
-				return fmt.Errorf("error writing audio chunk to output: %v", err)
-			}
-		}
-
+		_, err = io.Copy(output, reader)
 		return nil
 	}))
 }
