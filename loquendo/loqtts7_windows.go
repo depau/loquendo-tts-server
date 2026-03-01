@@ -105,7 +105,7 @@ func NewTTS(iniFile *string) (*TTS, error) {
 		currentPromptID: 0,
 		speechChannel:   nil,
 		channels:        2,
-		sampleRate:      32000,
+		sampleRate:      44100,
 	}
 
 	if err = ttsLib.TTSEnableEvent(reader, ffi_wrapper.TTSEventData, true); err != nil {
