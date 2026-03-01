@@ -1,4 +1,4 @@
-ARG BASE_TAG="ghcr.io/depau/loquendo-tts-server"
+ARG BASE_IMAGE="ghcr.io/depau/loquendo-tts-server:latest"
 
 ###############################################
 FROM alpine:3.23 AS downloader
@@ -10,7 +10,7 @@ RUN mkdir /dl && \
 COPY docker/license.reg /dl/license.reg
 
 ###############################################
-FROM $BASE_TAG/server:latest
+FROM $BASE_IMAGE
 
 USER wineuser
 
