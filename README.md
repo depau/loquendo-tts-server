@@ -76,6 +76,13 @@ Lists all available voices installed in the container.
 You can fine-tune the TTS engine by providing a list of parameters in the
 `instructions` field, separated by newlines.
 
+For instance:
+
+```
+AutoGuess=VoiceSentence:Italian,English
+ProsodicPauses=punctuation
+```
+
 | Parameter               | Values / Description                                                                                                 |
 |:------------------------|:---------------------------------------------------------------------------------------------------------------------|
 | `MultiSpacePause`       | `TRUE` (default), `FALSE` - Whether multiple spaces generate a pause.                                                |
