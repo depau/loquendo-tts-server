@@ -23,7 +23,7 @@ LABEL org.opencontainers.image.authors="Davide Depau <davide@depau.eu>"
 
 USER root
 
-RUN dnf -y install iproute procps gosu ffmpeg
+RUN dnf -y install iproute procps ffmpeg
 
 COPY --from=downloader /dl/unixbridge.dll /app/unixbridge.dll
 COPY --from=downloader /dl/unixbridge.exe /app/ffmpeg.exe
