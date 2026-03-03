@@ -23,10 +23,7 @@ LABEL org.opencontainers.image.authors="Davide Depau <davide@depau.eu>"
 
 USER root
 
-RUN export DPKG_FRONTEND=noninteractive && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends iproute2 procps gosu ffmpeg && \
-    rm -rf /var/lib/apt/lists/*
+RUN dnf -y install iproute procps gosu ffmpeg
 
 COPY --from=downloader /dl/unixbridge.dll /app/unixbridge.dll
 COPY --from=downloader /dl/unixbridge.exe /app/ffmpeg.exe
